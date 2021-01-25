@@ -1,6 +1,6 @@
 "use strict";
 
-import { make_js } from './lib/generator';
+import { makeJS } from './lib/generator';
 import { optimize } from './lib/optimizer';
 import { parse, InputStream, TokenStream }from './lib/parser'
 import { to_cps } from './lib/transformer';
@@ -69,7 +69,7 @@ if (typeof process != "undefined") (function(){
 
         var opt = optimize(cps);
         //var opt = cps; make_scope(opt);
-        var jsc = make_js(opt);
+        var jsc = makeJS(opt);
 
         jsc = "var 尾_TMP;\n\n" + jsc;
 
@@ -77,7 +77,7 @@ if (typeof process != "undefined") (function(){
             var vars = Object.keys(opt.env.vars);
             if (vars.length > 0) {
                 jsc = "var " + vars.map(function(name){
-                    return make_js({
+                    return makeJS({
                         type: "var",
                         value: name
                     });
