@@ -1,67 +1,68 @@
 import { FALSE } from './const'
 
-export function make_js(exp) {
+
+export function makeJS(exp: any) {
   return js(exp);
 
   function js(exp) {
       switch (exp.type) {
         case "num"    :
         case "str"    :
-        case "bool"   : return js_atom   (exp);
-        case "var"    : return js_var    (exp);
-        case "not"    : return js_not    (exp);
-        case "binary" : return js_binary (exp);
-        case "assign" : return js_assign (exp);
-        case "let"    : return js_let    (exp);
-        case "lambda" : return js_lambda (exp);
-        case "if"     : return js_if     (exp);
-        case "prog"   : return js_prog   (exp);
-        case "call"   : return js_call   (exp);
-        case "raw"    : return js_raw    (exp);
+        case "bool"   : return jsAtom(exp);
+        case "var"    : return jsVar(exp);
+        case "not"    : return jsNot(exp);
+        case "binary" : return jsBinary(exp);
+        case "assign" : return jsAssign(exp);
+        case "let"    : return jsLet(exp);
+        case "lambda" : return jsLambda(exp);
+        case "if"     : return jsIf(exp);
+        case "prog"   : return jsProg(exp);
+        case "call"   : return jsCall(exp);
+        case "raw"    : return jsRaw(exp);
         default:
           throw new Error("Dunno how to make_js for " + JSON.stringify(exp));
       }
   }
-  function js_raw(exp) {
+  function jsRaw(exp: { code: string; }) {
       return "(" + exp.code +")";
   }
-  function js_atom(exp) {
+  function jsAtom(exp: { value: any; }) {
       return JSON.stringify(exp.value); // cheating ;-)
   }
-  function make_var(name) {
+  function makeVar(name: any) {
       return name;
   }
-  function js_var(exp) {
-      return make_var(exp.value);
+  function jsVar(exp: { value: any; }) {
+      return makeVar(exp.value);
   }
-  function js_not(exp) {
-      if (is_bool(exp.body))
+  function jsNot(exp: { body: { type: any; then: any; else: any; operator: string; left: any; right: any; }; }) {
+      if (isBool(exp.body))
           return "!" + js(exp.body);
       return "(" + js(exp.body) + " === false)";
   }
-  function js_binary(exp) {
+  function jsBinary(exp) {
       var left = js(exp.left);
       var right = js(exp.right);
       switch (exp.operator) {
         case "&&":
-          if (is_bool(exp.left)) break;
+          if (isBool(exp.left)) break;
           return "((" + left + " !== false) && " + right + ")";
         case "||":
-          if (is_bool(exp.left)) break;
+          if (isBool(exp.left)) break;
           return "((尾_TMP = " + left + ") !== false ? 尾_TMP : " + right + ")";
       }
       return "(" + left + exp.operator + right + ")";
   }
-  function js_assign(exp) {
-      return js_binary(exp);
+  function jsAssign(exp) {
+      return jsBinary(exp);
   }
-  function js_lambda(exp) {
+  function jsLambda(exp) {
       var code = "(function ", CC;
       if (!exp.unguarded) {
           CC = exp.name || "尾_CC";
-          code += make_var(CC);
+          code += makeVar(CC);
       }
-      code += "(" + exp.vars.map(make_var).join(", ") + ") {";
+      code += "(" + exp.vars.map(makeVar).join(", ") + ") {";
       if (exp.locs && exp.locs.length > 0) {
           code += "var " + exp.locs.join(", ") + ";";
       }
@@ -77,7 +78,7 @@ export function make_js(exp) {
       code += js(exp.body) + " })";
       return code;
   }
-  function js_let(exp) {
+  function jsLet(exp: { type?: any; func?: { type: string; vars: any[]; body: { type: string; vars: any; body: any; }; }; args?: any[]; vars?: any; body?: any; }) {
       if (exp.vars.length == 0)
           return js(exp.body);
       var iife = {
@@ -95,25 +96,25 @@ export function make_js(exp) {
       };
       return "(" + js(iife) + ")";
   }
-  function is_bool(exp) {
+  function isBool(exp: { type: any; then: any; else: any; operator: string; left: any; right: any; }) {
       switch (exp.type) {
         case "bool":
         case "not":
           return true;
         case "if":
-          return is_bool(exp.then) || (exp.else && is_bool(exp.else));
+          return isBool(exp.then) || (exp.else && isBool(exp.else));
         case "binary":
           if (",<,<=,==,!=,>=,>,".indexOf("," + exp.operator + ",") >= 0)
               return true;
           if (exp.operator == "&&" || exp.operator == "||")
-              return is_bool(exp.left) && is_bool(exp.right);
+              return isBool(exp.left) && isBool(exp.right);
           break;
       }
       return false;
   }
-  function js_if(exp) {
+  function jsIf(exp) {
       var cond = js(exp.cond);
-      if (!is_bool(exp.cond))
+      if (!isBool(exp.cond))
           cond += " !== false";
       return "("
           +      cond
@@ -121,10 +122,10 @@ export function make_js(exp) {
           +      " : " + js(exp.else || FALSE)
           +  ")";
   }
-  function js_prog(exp) {
+  function jsProg(exp) {
       return "(" + exp.prog.map(js).join(", ") + ")";
   }
-  function js_call(exp) {
+  function jsCall(exp) {
       return js(exp.func) + "(" + exp.args.map(js).join(", ") + ")";
   }
 }

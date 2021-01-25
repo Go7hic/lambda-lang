@@ -6,7 +6,8 @@ import { parse, InputStream, TokenStream }from './lib/parser'
 import { to_cps } from './lib/transformer';
 
 
-let STACKLEN, IN_EXECUTE = false;
+let STACKLEN = false;
+let IN_EXECUTE = false;
 function GUARD(args, f) {
     if (--STACKLEN < 0) throw new Continuation(f, args);
 }
