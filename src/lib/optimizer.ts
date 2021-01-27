@@ -1,9 +1,9 @@
 
 import { FALSE, TRUE } from './const'
 import { Environment } from './environment'
-import { gensym, has_side_effects } from './transformer';
+import { gensym, hasSideEffects } from './transformer';
 
-export function make_scope(exp) {
+export function makeScope(exp) {
   var global = new Environment();
   exp.env = global;
   (function scope(exp, env) {
@@ -88,10 +88,11 @@ export function optimize(exp) {
   var changes, defun;
   do {
       changes = 0;
-      make_scope(exp);
+      makeScope(exp);
       exp = opt(exp);
   } while (changes);
-  make_scope(exp);
+
+  makeScope(exp);
   return exp;
 
   function opt(exp) {
@@ -290,7 +291,7 @@ export function optimize(exp) {
           changed();
           return opt(exp.prog[0]);
       }
-      if (!has_side_effects(exp.prog[0])) {
+      if (!hasSideEffects(exp.prog[0])) {
           changed();
           return opt({
               type : "prog",

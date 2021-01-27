@@ -1,13 +1,13 @@
 import { FALSE } from './const'
 let GENSYM = 0;
 
-export function gensym(name) {
+export function gensym(name: string | number) {
     if (!name) name = "";
     name = "尾_" + name;
     return name + (++GENSYM);
 }
 
-export function has_side_effects(exp) {
+export function hasSideEffects(exp: { type: any; left: any; right: any; cond: any; then: any; else: any; vars: string | any[]; body: any; prog: string | any[]; }) {
     switch (exp.type) {
       case "call":
       case "assign":
@@ -22,32 +22,32 @@ export function has_side_effects(exp) {
         return false;
 
       case "binary":
-        return has_side_effects(exp.left)
-            || has_side_effects(exp.right);
+        return hasSideEffects(exp.left)
+            || hasSideEffects(exp.right);
 
       case "if":
-        return has_side_effects(exp.cond)
-            || has_side_effects(exp.then)
-            || (exp.else && has_side_effects(exp.else));
+        return hasSideEffects(exp.cond)
+            || hasSideEffects(exp.then)
+            || (exp.else && hasSideEffects(exp.else));
 
       case "let":
         for (var i = 0; i < exp.vars.length; ++i) {
             var v = exp.vars[i];
-            if (v.def && has_side_effects(v.def))
+            if (v.def && hasSideEffects(v.def))
                 return true;
         }
-        return has_side_effects(exp.body);
+        return hasSideEffects(exp.body);
 
       case "prog":
         for (var i = 0; i < exp.prog.length; ++i)
-            if (has_side_effects(exp.prog[i]))
+            if (hasSideEffects(exp.prog[i]))
                 return true;
         return false;
     }
     return true;
 }
 
-export function to_cps(exp, k) {
+export function toCps(exp: { type: string; prog: any[]; }, k: (x: any) => { type: string; func: { type: string; value: string; }; args: any[]; }) {
     return cps(exp, k);
 
     function cps(exp, k) {
@@ -55,34 +55,34 @@ export function to_cps(exp, k) {
           case "raw"    :
           case "num"    :
           case "str"    :
-          case "bool"   : return cps_atom   (exp, k);
+          case "bool"   : return cpsAtom   (exp, k);
 
           case "assign" :
-          case "binary" : return cps_binary (exp, k);
+          case "binary" : return cpsBinary (exp, k);
 
-          case "not"    : return cps_not    (exp, k);
-          case "var"    : return cps_var    (exp, k);
-          case "let"    : return cps_let    (exp, k);
-          case "lambda" : return cps_lambda (exp, k);
-          case "if"     : return cps_if     (exp, k);
-          case "prog"   : return cps_prog   (exp, k);
-          case "call"   : return cps_call   (exp, k);
+          case "not"    : return cpsNot    (exp, k);
+          case "var"    : return cpsVar    (exp, k);
+          case "let"    : return cpsLet    (exp, k);
+          case "lambda" : return cpsLambda (exp, k);
+          case "if"     : return cpsIf     (exp, k);
+          case "prog"   : return cpsProg   (exp, k);
+          case "call"   : return cpsCall   (exp, k);
           default:
             throw new Error("Dunno how to CPS " + JSON.stringify(exp));
         }
     }
-    function cps_atom(exp, k) {
+    function cpsAtom(exp, k) {
         return k(exp);
     }
-    function cps_not(exp, k) {
+    function cpsNot(exp, k) {
         return cps(exp.body, function(body){
             return k({ type: "not", body: body });
         });
     }
-    function cps_var(exp, k) {
+    function cpsVar(exp, k) {
         return k(exp);
     }
-    function cps_binary(exp, k) {
+    function cpsBinary(exp, k) {
         return cps(exp.left, function(left){
             return cps(exp.right, function(right){
                 return k({ type     : exp.type,
@@ -92,7 +92,7 @@ export function to_cps(exp, k) {
             });
         });
     }
-    function cps_let(exp, k) {
+    function cpsLet(exp, k) {
         if (exp.vars.length == 0)
             return cps(exp.body, k);
         return cps({
@@ -109,7 +109,7 @@ export function to_cps(exp, k) {
             }
         }, k);
     }
-    function cps_lambda(exp, k) {
+    function cpsLambda(exp, k) {
         var cont = gensym("K");
         var body = cps(exp.body, function(body){
             return { type: "call",
@@ -121,10 +121,10 @@ export function to_cps(exp, k) {
                    vars: [ cont ].concat(exp.vars),
                    body: body });
     }
-    function cps_if(exp, k) {
+    function cpsIf(exp, k) {
         return cps(exp.cond, function(cond){
             var cvar = gensym("I");
-            var cast = make_continuation(k);
+            var cast = makeContinuation(k);
             k = function(ifresult) {
                 return {
                     type: "call",
@@ -148,7 +148,7 @@ export function to_cps(exp, k) {
             };
         });
     }
-    function cps_call(exp, k) {
+    function cpsCall(exp, k) {
         return cps(exp.func, function(func){
             return (function loop(args, i){
                 if (i == exp.args.length) return {
@@ -160,24 +160,24 @@ export function to_cps(exp, k) {
                     args[i + 1] = value;
                     return loop(args, i + 1);
                 });
-            })([ make_continuation(k) ], 0);
+            })([ makeContinuation(k) ], 0);
         });
     }
-    function make_continuation(k) {
+    function makeContinuation(k) {
         var cont = gensym("R");
         return { type : "lambda",
                  vars : [ cont ],
                  body : k({ type  : "var",
                             value : cont }) };
     }
-    function cps_prog(exp, k) {
+    function cpsProg(exp, k) {
         return (function loop(body){
             if (body.length == 0) return k(FALSE);
             if (body.length == 1) return cps(body[0], k);
-            if (!has_side_effects(body[0]))
+            if (!hasSideEffects(body[0]))
                 return loop(body.slice(1));
             return cps(body[0], function(first){
-                if (has_side_effects(first)) return {
+                if (hasSideEffects(first)) return {
                     type: "prog",
                     prog: [ first, loop(body.slice(1)) ]
                 };
