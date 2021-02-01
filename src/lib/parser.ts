@@ -10,26 +10,27 @@ export function parse(input) {
       "+": 10, "-": 10,
       "*": 20, "/": 20, "%": 20,
   };
-  return parse_toplevel();
+  return parseToplevel();
 
-  function is_punc(ch) {
+  function isPunc(ch: any) {
       var tok = input.peek();
       return tok && tok.type == "punc" && (!ch || tok.value == ch) && tok;
   }
-  function is_kw(kw) {
+
+  function isKw(kw: any) {
       var tok = input.peek();
       return tok && tok.type == "kw" && (!kw || tok.value == kw) && tok;
   }
-  function is_op(op?:any) {
+  function isOp(op?:any) {
       var tok = input.peek();
       return tok && tok.type == "op" && (!op || tok.value == op) && tok;
   }
-  function skip_punc(ch) {
-      if (is_punc(ch)) input.next();
+  function skipPunc(ch: string) {
+      if (isPunc(ch)) input.next();
       else input.croak("Expecting punctuation: \"" + ch + "\"");
   }
-  function skip_kw(kw) {
-      if (is_kw(kw)) input.next();
+  function skipKw(kw: string) {
+      if (isKw(kw)) input.next();
       else input.croak("Expecting keyword: \"" + kw + "\"");
   }
   // function skip_op(op) {
@@ -39,108 +40,109 @@ export function parse(input) {
   function unexpected() {
       input.croak("Unexpected token: " + JSON.stringify(input.peek()));
   }
-  function maybe_binary(left, my_prec) {
-      var tok = is_op();
+  function maybeBinary(left, myPrec) {
+      var tok = isOp();
       if (tok) {
           var his_prec = PRECEDENCE[tok.value];
-          if (his_prec > my_prec) {
+          if (his_prec > myPrec) {
               input.next();
-              return maybe_binary({
+              return maybeBinary({
                   type     : tok.value == "=" ? "assign" : "binary",
                   operator : tok.value,
                   left     : left,
-                  right    : maybe_binary(parse_atom(), his_prec)
-              }, my_prec);
+                  right    : maybeBinary(parseAtom(), his_prec)
+              }, myPrec);
           }
       }
       return left;
   }
+
   function delimited(start, stop, separator, parser) {
       var a = [], first = true;
-      skip_punc(start);
+      skipPunc(start);
       while (!input.eof()) {
-          if (is_punc(stop)) break;
-          if (first) first = false; else skip_punc(separator);
-          if (is_punc(stop)) break;
+          if (isPunc(stop)) break;
+          if (first) first = false; else skipPunc(separator);
+          if (isPunc(stop)) break;
           a.push(parser());
       }
-      skip_punc(stop);
+      skipPunc(stop);
       return a;
   }
-  function parse_call(func) {
+  function parseCall(func) {
       return {
           type: "call",
           func: func,
-          args: delimited("(", ")", ",", parse_expression),
+          args: delimited("(", ")", ",", parseExpression),
       };
   }
-  function parse_varname() {
+  function parseVarname() {
       var name = input.next();
       if (name.type != "var") input.croak("Expecting variable name");
       return name.value;
   }
-  function parse_vardef() {
-      var name = parse_varname(), def;
-      if (is_op("=")) {
+  function parseVardef() {
+      var name = parseVarname(), def;
+      if (isOp("=")) {
           input.next();
-          def = parse_expression();
+          def = parseExpression();
       }
       return { name: name, def: def };
   }
-  function parse_let() {
-      skip_kw("let");
+  function parseLet() {
+      skipKw("let");
       if (input.peek().type == "var") {
           var name = input.next().value;
-          var defs = delimited("(", ")", ",", parse_vardef);
+          var defs = delimited("(", ")", ",", parseVardef);
           return {
               type: "call",
               func: {
                   type: "lambda",
                   name: name,
                   vars: defs.map(function(def){ return def.name }),
-                  body: parse_expression(),
+                  body: parseExpression(),
               },
               args: defs.map(function(def){ return def.def || FALSE })
           };
       }
       return {
           type: "let",
-          vars: delimited("(", ")", ",", parse_vardef),
-          body: parse_expression(),
+          vars: delimited("(", ")", ",", parseVardef),
+          body: parseExpression(),
       };
   }
-  function parse_if() {
-      skip_kw("if");
-      var cond = parse_expression();
-      if (!is_punc("{")) skip_kw("then");
-      var then = parse_expression();
+  function parseIf() {
+      skipKw("if");
+      var cond = parseExpression();
+      if (!isPunc("{")) skipKw("then");
+      var then = parseExpression();
       var ret: {[key: string]: string} = {
           type: "if",
           cond: cond,
           then: then,
       };
-      if (is_kw("else")) {
+      if (isKw("else")) {
           input.next();
-          ret.else = parse_expression();
+          ret.else = parseExpression();
       }
       return ret;
   }
-  function parse_lambda() {
+  function parseLambda() {
       return {
           type: "lambda",
           name: input.peek().type == "var" ? input.next().value : null,
-          vars: delimited("(", ")", ",", parse_varname),
-          body: parse_expression()
+          vars: delimited("(", ")", ",", parseVarname),
+          body: parseExpression()
       };
   }
-  function parse_bool() {
+  function parseBool() {
       return {
           type  : "bool",
           value : input.next().value == "true"
       };
   }
-  function parse_raw() {
-      skip_kw("js:raw");
+  function parseRaw() {
+      skipKw("js:raw");
       if (input.peek().type != "str")
           input.croak("js:raw must be a plain string");
       return {
@@ -148,33 +150,33 @@ export function parse(input) {
           code : input.next().value
       };
   }
-  function maybe_call(expr) {
+  function maybeCall(expr) {
       expr = expr();
-      return is_punc("(") ? parse_call(expr) : expr;
+      return isPunc("(") ? parseCall(expr) : expr;
   }
-  function parse_atom() {
-      return maybe_call(function(){
-          if (is_punc("(")) {
+  function parseAtom() {
+      return maybeCall(function(){
+          if (isPunc("(")) {
               input.next();
-              var exp = parse_expression();
-              skip_punc(")");
+              var exp = parseExpression();
+              skipPunc(")");
               return exp;
           }
-          if (is_punc("{")) return parse_prog();
-          if (is_op("!")) {
+          if (isPunc("{")) return parseProg();
+          if (isOp("!")) {
               input.next();
               return {
                   type: "not",
-                  body: parse_atom()
+                  body: parseAtom()
               };
           }
-          if (is_kw("let")) return parse_let();
-          if (is_kw("if")) return parse_if();
-          if (is_kw("true") || is_kw("false")) return parse_bool();
-          if (is_kw("js:raw")) return parse_raw();
-          if (is_kw("lambda") || is_kw("位")) {
+          if (isKw("let")) return parseLet();
+          if (isKw("if")) return parseIf();
+          if (isKw("true") || isKw("false")) return parseBool();
+          if (isKw("js:raw")) return parseRaw();
+          if (isKw("lambda") || isKw("位")) {
               input.next();
-              return parse_lambda();
+              return parseLambda();
           }
           var tok = input.next();
           if (tok.type == "var" || tok.type == "num" || tok.type == "str")
@@ -182,23 +184,23 @@ export function parse(input) {
           unexpected();
       });
   }
-  function parse_toplevel() {
+  function parseToplevel() {
       var prog = [];
       while (!input.eof()) {
-          prog.push(parse_expression());
-          if (!input.eof()) skip_punc(";");
+          prog.push(parseExpression());
+          if (!input.eof()) skipPunc(";");
       }
       return { type: "prog", prog: prog };
   }
-  function parse_prog() {
-      var prog = delimited("{", "}", ";", parse_expression);
+  function parseProg() {
+      var prog = delimited("{", "}", ";", parseExpression);
       if (prog.length == 0) return FALSE;
       if (prog.length == 1) return prog[0];
       return { type: "prog", prog: prog };
   }
-  function parse_expression() {
-      return maybe_call(function(){
-          return maybe_binary(parse_atom(), 0);
+  function parseExpression() {
+      return maybeCall(function(){
+          return maybeBinary(parseAtom(), 0);
       });
   }
 }
@@ -243,53 +245,53 @@ export function TokenStream(input:any) {
       eof   : eof,
       croak : input.croak
   };
-  function is_keyword(x) {
+  function isKeyword(x) {
       return keywords.indexOf(" " + x + " ") >= 0;
   }
-  function is_digit(ch) {
+  function isDigit(ch) {
       return /[0-9]/i.test(ch);
   }
-  function is_id_start(ch) {
+  function isIdStart(ch) {
       return /[a-z位_]/i.test(ch);
   }
-  function is_id(ch) {
-      return is_id_start(ch) || "?!-<:>=0123456789".indexOf(ch) >= 0;
+  function isId(ch) {
+      return isIdStart(ch) || "?!-<:>=0123456789".indexOf(ch) >= 0;
   }
-  function is_op_char(ch) {
+  function isOpChar(ch) {
       return "+-*/%=&|<>!".indexOf(ch) >= 0;
   }
-  function is_punc(ch) {
+  function isPunc(ch) {
       return ",;(){}[]:".indexOf(ch) >= 0;
   }
-  function is_whitespace(ch) {
+  function isWhitespace(ch) {
       return " \t\n".indexOf(ch) >= 0;
   }
-  function read_while(predicate) {
+  function readWhile(predicate) {
       var str = "";
       while (!input.eof() && predicate(input.peek()))
           str += input.next();
       return str;
   }
-  function read_number() {
+  function readNumber() {
       var has_dot = false;
-      var number = read_while(function(ch){
+      var number = readWhile(function(ch){
           if (ch == ".") {
               if (has_dot) return false;
               has_dot = true;
               return true;
           }
-          return is_digit(ch);
+          return isDigit(ch);
       });
       return { type: "num", value: parseFloat(number) };
   }
-  function read_ident() {
-      var id = read_while(is_id);
+  function readIdent() {
+      var id = readWhile(isId);
       return {
-          type  : is_keyword(id) ? "kw" : "var",
+          type  : isKeyword(id) ? "kw" : "var",
           value : id
       };
   }
-  function read_escaped(end) {
+  function readEscaped(end) {
       var escaped = false, str = "";
       input.next();
       while (!input.eof()) {
@@ -307,41 +309,41 @@ export function TokenStream(input:any) {
       }
       return str;
   }
-  function read_string() {
-      return { type: "str", value: read_escaped('"') };
+  function readString() {
+      return { type: "str", value: readEscaped('"') };
   }
-  function skip_comment() {
-      read_while(function(ch){ return ch != "\n" });
+  function skipComment() {
+      readWhile(function(ch){ return ch != "\n" });
       input.next();
   }
-  function read_next() {
-      read_while(is_whitespace);
+  function readNext() {
+      readWhile(isWhitespace);
       if (input.eof()) return null;
       var ch = input.peek();
       if (ch == "#") {
-          skip_comment();
-          return read_next();
+          skipComment();
+          return readNext();
       }
-      if (ch == '"') return read_string();
-      if (is_digit(ch)) return read_number();
-      if (is_id_start(ch)) return read_ident();
-      if (is_punc(ch)) return {
+      if (ch == '"') return readString();
+      if (isDigit(ch)) return readNumber();
+      if (isIdStart(ch)) return readIdent();
+      if (isPunc(ch)) return {
           type  : "punc",
           value : input.next()
       };
-      if (is_op_char(ch)) return {
+      if (isOpChar(ch)) return {
           type  : "op",
-          value : read_while(is_op_char)
+          value : readWhile(isOpChar)
       };
       input.croak("Can't handle character: " + ch);
   }
   function peek() {
-      return current || (current = read_next());
+      return current || (current = readNext());
   }
   function next() {
       var tok = current;
       current = null;
-      return tok || read_next();
+      return tok || readNext();
   }
   function eof() {
       return peek() == null;
