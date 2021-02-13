@@ -103,13 +103,13 @@ export function optimize(exp) {
         case "str"    :
         case "bool"   :
         case "var"    : return exp;
-        case "not"    : return opt_not    (exp);
-        case "binary" : return opt_binary (exp);
-        case "assign" : return opt_assign (exp);
-        case "if"     : return opt_if     (exp);
-        case "prog"   : return opt_prog   (exp);
-        case "call"   : return opt_call   (exp);
-        case "lambda" : return opt_lambda (exp);
+        case "not"    : return optNot    (exp);
+        case "binary" : return optBinary (exp);
+        case "assign" : return optAssign (exp);
+        case "if"     : return optIf     (exp);
+        case "prog"   : return optProg   (exp);
+        case "call"   : return optCall   (exp);
+        case "lambda" : return optLambda (exp);
       }
       throw new Error("I don't know how to optimize " + JSON.stringify(exp));
   }
@@ -118,7 +118,7 @@ export function optimize(exp) {
       ++changes;
   }
 
-  function is_constant(exp) {
+  function isConstant(exp) {
       return exp.type == "num"
           || exp.type == "str"
           || exp.type == "bool";
@@ -136,15 +136,15 @@ export function optimize(exp) {
       return exp.value;
   }
 
-  function opt_not(exp) {
+  function optNot(exp) {
       exp.body = opt(exp.body);
       return exp;
   }
 
-  function opt_binary(exp) {
+  function optBinary(exp) {
       exp.left = opt(exp.left);
       exp.right = opt(exp.right);
-      if (is_constant(exp.left) && is_constant(exp.right)) {
+      if (isConstant(exp.left) && isConstant(exp.right)) {
           switch (exp.operator) {
             case "+":
               changed();
@@ -243,7 +243,7 @@ export function optimize(exp) {
       return exp;
   }
 
-  function opt_assign(exp) {
+  function optAssign(exp) {
       if (exp.left.type == "var") {
           if (exp.right.type == "var" && exp.right.def.cont) {
               // the var on the right never changes.  we can safely
@@ -269,11 +269,11 @@ export function optimize(exp) {
       return exp;
   }
 
-  function opt_if(exp) {
+  function optIf(exp) {
       exp.cond = opt(exp.cond);
       exp.then = opt(exp.then);
       exp.else = opt(exp.else || FALSE);
-      if (is_constant(exp.cond)) {
+      if (isConstant(exp.cond)) {
           changed();
           if (exp.cond.value !== false)
               return exp.then;
@@ -282,7 +282,7 @@ export function optimize(exp) {
       return exp;
   }
 
-  function opt_prog(exp) {
+  function optProg(exp) {
       if (exp.prog.length == 0) {
           changed();
           return FALSE;
@@ -312,14 +312,14 @@ export function optimize(exp) {
       });
   }
 
-  function opt_call(exp) {
+  function optCall(exp) {
       // IIFE-s will be optimized away by defining variables in the
       // containing function.  However, we don't unwrap into the
       // global scope (that's why checking for env.parent.parent).
       var func = exp.func;
       if (func.type == "lambda" && !func.name) {
           if (func.env.parent.parent)
-              return opt_iife(exp);
+              return optIife(exp);
           // however, if in global scope we can safely unguard it.
           func.unguarded = true;
       }
@@ -330,7 +330,7 @@ export function optimize(exp) {
       };
   }
 
-  function opt_lambda(f) {
+  function optLambda(f) {
       // 位(x...) y(x...)  ==>  y
       TCO: if (f.body.type == "call" &&
                f.body.func.type == "var" &&
@@ -362,7 +362,7 @@ export function optimize(exp) {
   // (位(foo, bar){...body...})(fooval, barval)
   //    ==>
   // foo = fooval, bar = barval, ...body...
-  function opt_iife(exp) {
+  function optIife(exp) {
       changed();
       var func = exp.func;
       var argvalues = exp.args.map(opt);
