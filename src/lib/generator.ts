@@ -53,10 +53,10 @@ export function makeJS(exp: any) {
       }
       return "(" + left + exp.operator + right + ")";
   }
-  function jsAssign(exp) {
+  function jsAssign(exp: any) {
       return jsBinary(exp);
   }
-  function jsLambda(exp) {
+  function jsLambda(exp: { unguarded: any; name: string; vars: any[]; locs: any[]; body: any; }) {
       var code = "(function ", CC;
       if (!exp.unguarded) {
           CC = exp.name || "尾_CC";
